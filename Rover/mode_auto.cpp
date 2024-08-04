@@ -593,18 +593,6 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
         do_set_reverse(cmd);
         break;
 
-    case MAV_CMD_DO_FENCE_ENABLE:
-#if AP_FENCE_ENABLED
-        if (cmd.p1 == 0) {  //disable
-            rover.fence.enable(false);
-            gcs().send_text(MAV_SEVERITY_INFO, "Fence Disabled");
-        } else {  //enable fence
-            rover.fence.enable(true);
-            gcs().send_text(MAV_SEVERITY_INFO, "Fence Enabled");
-        }
-#endif
-        break;
-
     case MAV_CMD_DO_GUIDED_LIMITS:
         do_guided_limits(cmd);
         break;
@@ -626,16 +614,25 @@ void ModeAuto::exit_mission()
     // send message
     gcs().send_text(MAV_SEVERITY_NOTICE, "Mission Complete");
 
-    if (g2.mis_done_behave == MIS_DONE_BEHAVE_LOITER && start_loiter()) {
-        return;
-    }
-
-    if (g2.mis_done_behave == MIS_DONE_BEHAVE_ACRO && rover.set_mode(rover.mode_acro, ModeReason::MISSION_END)) {
-        return;
-    }
-
-    if (g2.mis_done_behave == MIS_DONE_BEHAVE_MANUAL && rover.set_mode(rover.mode_manual, ModeReason::MISSION_END)) {
-        return;
+    switch ((DoneBehaviour)g2.mis_done_behave) {
+    case DoneBehaviour::HOLD:
+        // the default "start_stop" behaviour is used
+        break;
+    case DoneBehaviour::LOITER:
+        if (start_loiter()) {
+            return;
+        }
+        break;
+    case DoneBehaviour::ACRO:
+        if (rover.set_mode(rover.mode_acro, ModeReason::MISSION_END)) {
+            return;
+        }
+        break;
+    case DoneBehaviour::MANUAL:
+        if (rover.set_mode(rover.mode_manual, ModeReason::MISSION_END)) {
+            return;
+        }
+        break;
     }
 
     start_stop();
